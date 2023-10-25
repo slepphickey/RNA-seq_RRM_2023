@@ -10,4 +10,4 @@ install.packges(c("tidyverse", "here", "gganimate", "RColorBrewer",
 # Bioconductor packages
 if (!require("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
 
-BiocManager::install(c("biomaRt", "genefilter", "DESeq2","fgsea", "edgeR"))
+BiocManager::install(c("biomaRt", "genefilter", "DESeq2","fgsea", "edgeR", "GO.db"))

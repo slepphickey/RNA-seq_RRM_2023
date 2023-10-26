@@ -1,0 +1,500 @@
+---
+title: 'Part 2: Differential Expression'
+author: "Stephanie Hickey"
+date: "2023-10-24"
+output: html_document
+---
+
+## Set Up
+
+### Load necessary libraries
+```{r, load }
+library(tidyverse)
+library(DESeq2)
+library(edgeR)
+library(ggfortify)
+library(DT)
+library(ggrepel)
+library(patchwork)
+library(RColorBrewer)
+library(pheatmap)
+
+set.seed(1) # to make sure that we get the same results for randomization
+```
+
+### Set your project paths in advance 
+```{r, set paths}
+# tells us which directory we're currently in
+# if you opened Rstudio by clicking `RNA-seq_RRM_2023.Rproj`
+# you should already be in the `RNA-seq_RRM_2023` directory
+getwd() 
+
+# if not use `setwd()` to set the working directory to `RNA-seq_RRM_2023`
+# setwd("path/to/RNA-seq_RRM_2023")
+project_path <- getwd()
+
+# make a new folder called "part2_results" to hold the results
+part2_results <- paste0(project_path, "/part2_results")
+if(!dir.exists(part2_results)){dir.create(part2_results)}
+
+```
+
+### Load the data
+
+This dataset comes from this [manuscript](https://www-science-org.proxy1.cl.msu.edu/doi/10.1126/scitranslmed.aax4204), and is also used in Daniel Beiting's [DIY Transcriptomics](https://diytranscriptomics.com/data) course. This is an RNAseq dataset from skin biopsies obtained from patients with cutaneous leishmaniasis, a parasitic disease endemic in Brazil and other areas of South America. You’ll be working with data from 5 patients with this disease and 5 healthy endemic controls. I added the collection date information to the study design to introduce the concept of a batch effect. It is not a part of the real dataset.
+
+```{r, load data}
+counts <- read_delim("data/part2_RNAseq.counts.txt")
+
+glimpse(counts)
+
+meta_data <- read_delim("data/part2_studydesign.txt")
+
+meta_data
+```
+
+## Normalize, filter, and visualize expression data
+
+### CPM normalize
+
+Use the `cpm` function in the `edgeR` package to calculate counts per million. 
+
+```{r, CPM}
+# the counts are stored in a data frame object class
+class(counts)
+
+# the `cpm` function requires a matrix object 
+# matrices can only hold one data type, like numeric values
+# so we need to remove the `Gene` column which is a character column
+genes <- 
+  counts %>%
+  pull(Gene) # `pull` turns the Gene column into a character vector
+
+head(genes)
+
+# remove the gene column
+counts_mat <- 
+  counts %>%
+  select(-Gene)
+
+# turn into a matrix
+counts_mat = as.matrix(counts_mat)
+  
+# add the genes back as row names
+rownames(counts_mat) = genes
+class(counts_mat)
+head(counts_mat)
+
+cpm_mat = cpm(counts_mat, log=TRUE)
+dim(cpm_mat)
+```
+
+### Remove genes with low expression
+
+Now we want to set some cut-off to get rid of genes with low expression, because it is difficult to assess differential expression of these genes accurately. Reducing the number of genes we test for differential expression reduces our false discovery rate later.
+
+We'll use the `rowSums` function to tally up the 'TRUE' results of a simple evaluation: how many genes had more than 1 CPM (TRUE) in at least 5 samples?
+
+Here, we chose 5 samples because the groups we are comparing have 5 samples each. 
+
+```{r}
+keepers <- rowSums(cpm_mat>1)>=5
+head(keepers)
+```
+
+#### Base R's subsetting method
+
+`mat[row, col]` selects the specified rows and columns. `Row` and `col` can be numeric, referring to the position, or "index", of the row or column you want to select. `Row` and `col` can be characters vectors corresponding to the row and column names you want to select, or, like in this example, they can be named "logical" vectors, containing all of the genes with `TRUE` or `FALSE` labels. `FALSE` genes will be filtered out of the matrix. Leaving `col`/`row` blank keeps all of the columns/rows.
+
+```{r}
+# keep the rows matching the "TRUE" genes in the keepers vector
+cpm_mat_filt <- cpm_mat[keepers,] 
+
+# what are the dimentions of the filtered and unfiltered matrices?
+dim(cpm_mat)
+dim(cpm_mat_filt)
+```
+
+### Plot expression
+
+As in Part 1, we'll use violin plots to show the gene expression distribution in each sample in both the filtered and unfiltered data.
+```{r, fig.height=10, fig.width = 10}
+# tidy cpm_mat
+cpm_long <- 
+  as_tibble(cpm_mat, rownames = "Gene") %>%
+  pivot_longer(cols = -Gene, 
+               names_to = "Sample", 
+               values_to= "log2CPM")
+
+plot_cpm <- 
+  cpm_long %>%
+  ggplot() +
+    aes(x=Sample, y=log2CPM, fill=Sample) +
+    geom_violin(trim = FALSE, show.legend = FALSE) +
+    stat_summary(fun = "median", 
+                 geom = "point", 
+                 shape = 124, 
+                 size = 7, 
+                 color = "black", 
+                 show.legend = FALSE) +
+    labs(y="log2 expression", x = "sample",
+         title="Log2 Counts per Million (CPM)",
+         subtitle="unfiltered",
+         caption=paste0("produced on ", Sys.time())) +
+    theme_bw() +
+    coord_flip()
+
+# tidy CPM_filt_mat
+cpm_filt_long <- 
+  as_tibble(cpm_mat_filt, rownames = "Gene") %>%
+  pivot_longer(cols = -Gene, 
+               names_to = "Sample", 
+               values_to= "log2CPM")
+
+plot_cpm_filt <- 
+  cpm_filt_long %>%
+  ggplot() +
+    aes(x=Sample, y=log2CPM, fill=Sample) +
+    geom_violin(trim = FALSE, show.legend = FALSE) +
+    stat_summary(fun = "median", 
+                 geom = "point", 
+                 shape = 124, 
+                 size = 7, 
+                 color = "black", 
+                 show.legend = FALSE) +
+    labs(y="log2 expression", x = "sample",
+         title="Log2 Counts per Million (CPM)",
+         subtitle="filtered",
+         caption=paste0("produced on ", Sys.time())) +
+    theme_bw() +
+    coord_flip()
+
+# show the two plots together with `patchwork`
+plot_both <- plot_cpm / plot_cpm_filt
+plot_both
+
+ggsave(plot_both, file = "cpm_viloin.png", path = part2_results, width = 10, height = 10)
+
+```
+
+## PCA plot
+
+A PCA (Principal Component Analysis) plot is a way to visualize and explore the variation in gene expression data obtained from RNA-seq experiments.
+
+RNA-seq generates thousands of gene expression values, and PCA is a technique to reduce the complexity of this data by identifying the most important patterns of variation across the samples. In a PCA plot, each sample is represented as a point in a two-dimensional space, where the axes correspond to the principal components that capture the largest amounts of variation in the data.
+
+A PCA plot for RNA-seq data allows you to visualize and explore the relationships between samples based on their gene expression profiles. This can be useful for identifying groups of samples that cluster together based on their gene expression patterns, or for identifying outliers or potential confounding factors that may be affecting the results.
+
+For a nice explanation of what's going on under the hood of a PCA analysis, check out Josh Stormer's StatQuest video [Principal Component Analysis (PCA), Step-by-Step](https://www.youtube.com/watch?v=FgakZw6K1QQ&vl=en&ab_channel=StatQuestwithJoshStarmer)
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=4}
+
+# Run pca with the `prcomp()` function
+# prcomp requires genes to be in columns and samples to be in rows
+# so we need to apply the `t` function to transpose the CPM data
+
+# print the first five columns of the transposed matrix
+t(cpm_mat_filt)[,1:5]
+
+# run pca
+pca <- prcomp(t(cpm_mat_filt), scale. = TRUE)
+
+# plot with `autoplot()` from the ggplot2 package
+
+group_pca <- 
+  autoplot(pca,
+           data = meta_data, # tells autoplot which samples go with which traits
+           colour = "group") + # which trait do we want to use to color the points?
+  geom_text_repel(label=meta_data$sample, size=2) + # ensure that the point labels don't overlap
+  labs(title="PCA, filtered CPM",
+       subtitle = "labeled by disease state",
+       caption=paste0("produced on ", Sys.time()))
+  
+  
+date_pca <- 
+  autoplot(pca,
+           data = meta_data, # tells autoplot which samples go with which traits
+           colour = "collection_date") + # which trait do we want to use to color the points?
+  geom_text_repel(label=meta_data$sample, size=2) + # ensure that the point labels don't overlap
+  labs(title="PCA, filtered CPM",
+       subtitle = "labeled by collection date",
+       caption=paste0("produced on ", Sys.time()))
+  
+# plot them together with patchwork
+pca_plots <- group_pca | date_pca
+pca_plots
+
+ggsave(plot_both, file = "cpm_filt_pca.png", path = part2_results, width = 10, height = 4)
+```
+
+## Find differentially expressed genes with DESeq2
+
+We'll use DESeq2 with the raw count data to do the differential expression analysis. Check out this [vignette](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) for everything you need to know about running differential expression experiment with DESeq2.
+
+For a nice explanation of what's going on under the hood of `DESeq2`, check out 
+Bioinformagician's video [DESeq2 Basics Explained](https://www.youtube.com/watch?v=0b24mpzM_5M&ab_channel=Bioinformagician). 
+
+### Filter the count matrix
+
+We only want to perform differential expression on the filtered genes.
+```{r}
+counts_mat_filt <- counts_mat[keepers,] 
+dim(counts_mat)
+dim(counts_mat_filt)
+```
+
+### Perform differential expression analysis
+```{r, message=FALSE, warning=FALSE}
+# change meta_data to a data frame from a "tibble"
+meta_data_df <- as.data.frame(meta_data)
+
+# Add rownames to meta_data
+# df$column gives you a vector containing the values of that column
+rownames(meta_data_df) <- meta_data_df$sample
+
+# make DESeq dataset object
+dds <- DESeqDataSetFromMatrix(countData = counts_mat_filt,
+                              colData = meta_data_df, # gives DESeq information about the samples
+                              design = ~ group) # tells DESeq we want to compare samples by group
+
+# tell DESeq2 which group represents the control or "reference" group
+dds$group <- relevel(dds$group, ref = "healthy")
+
+# if you include a batch effect
+# dds <- DESeqDataSetFromMatrix(countData = counts,
+#                               colData = coldata,
+#                               design = ~ batch + condition)
+#
+# dds <- DESeqDataSetFromMatrix(countData = counts_mat_filt,
+#                               colData = meta_data_df,
+#                               design = ~ collection_date + group)
+
+# perform differential expression
+dds <- DESeq(dds)
+```
+
+### Display the results
+
+*Results columns* 
+  
+  * `baseMean`: gives the mean of the gene expression across all samples.    
+  * `log2FoldChange`: $\log_{2}(\frac{mean(DiseaseExpression)}{mean(HealthyExpression)})$ 
+      + `log2FoldChange` < 0 indicates genes down-regulated in the disease state  
+      + `log2FoldChange` > 0 indicates genes up-regulated in the disease state   
+      + `log2FoldChange` = 0 indicates no difference between the disease and health state    
+  * `lfcSE`: gives the standard error of the log2FoldChange.    
+  * `stat`: stat is the Wald statistic: the log2FoldChange divided by lfcSE
+  * `pvalue`: two-tailed pvalue calculated by comparing the Wald statistic to a standard Normal distribution.          
+  * `padj`: The p-value adjusted for multiple comparisons using the Benjamini-Hochberg method. Also called the false discovery rate (FDR). Filtering for padj of `0.01` implies that 1% of significant tests will result in false positives. For a detailed explaination see StatQuest's video [False Discovery Rates, FDR, clearly explained](https://www.youtube.com/watch?v=K8LQSvtjcEo&ab_channel=StatQuestwithJoshStarmer)   
+
+**NOTE: on p-values set to NA**
+
+  * If a row contains a sample with an extreme count outlier then the p-value and adjusted p-value will be set to NA. These outlier counts are detected by Cook’s distance.    
+  * If a row is filtered by automatic independent filtering, for having a low mean normalized count, then only the adjusted p-value will be set to NA.    
+
+```{r}
+# lists the comparisons (in case more than one was made)
+resultsNames(dds) 
+
+# pulls the results from the dds objects as a data frame
+resdf <- as.data.frame(results(dds, name="group_disease_vs_healthy"))
+
+# make a "Gene" column from the rownames
+genes = rownames(resdf)
+
+resdf <- 
+  resdf %>%
+  mutate(Gene = genes) %>% # adds Gene column 
+  relocate(Gene) %>% # makes Gene the first column 
+  arrange(padj)
+  
+write_delim(resdf, file = paste(part2_results, "deseq2_results.txt", sep = "/")) 
+
+# filter significant padj
+# and round numbers for display
+
+res_filt <- 
+  resdf %>%
+  filter(padj < .01) %>% # `0.01` implies that 1% of significant tests will result in false positives
+  mutate(across(-Gene, function(x){format(x, digits=3)}))
+  
+# make an interactive table using the `datatable function`
+datatable(res_filt, rownames = FALSE, caption = "Genes with padj < .01")
+```
+
+## Volcano Plots
+
+Volcano plots display the `-log10(adjusted p-val)` on the y-axis and the`'log2FoldChange` on the x-axis for each gene. `-log10(adjusted p-val)` makes very low adjusted p-values large, and adjusted p-values of 1 change to zero.
+
+Genes with `log2FoldChange > 0` are up-regulated in the disease state relative to the healthy state, and genes `log2FoldChange < 0` are down-regulated in the disease state relative to the healthy state. We can be confident that genes are differentially expressed if `adjusted p-value < .01`. Genes above the gray line in the plot meet this threshold. The top 10 differentially expressed genes by `-log10(adjusted p-value)` are labeled.
+
+```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
+# define the max adjusted pval 
+pcutoff = .01
+
+  # find the top ten DE genes by adj.P.Val so we can add labels to the plot
+  top_ten_genes = 
+    resdf %>%
+    slice_min(order_by = padj,
+              n = 10) 
+  
+  # Add a column with whether the gene is significantly up- or down- regulated
+  resdf = 
+    resdf %>%
+    mutate(Regulation = case_when(
+      padj < pcutoff & log2FoldChange < 0 ~ "down-regulated",
+      padj < pcutoff & log2FoldChange > 0 ~ "up-regulated",
+      padj >= pcutoff ~ "no change"
+    ))
+    
+  # count up and down-regulated genes so we can print this on the plot
+  nUP = sum(resdf$Regulation == "up-regulated", na.rm = TRUE)
+  nDOWN = sum(resdf$Regulation == "down-regulated", na.rm = TRUE)
+  
+  # make the volcano plot
+  volc_plot <- 
+    resdf %>%
+    filter(!is.na(Regulation)) %>%                           # remove pval = na
+    ggplot(aes(y=-log10(padj), x=log2FoldChange)) +          # plot -log10(padj) v log2FoldChange
+      geom_point(size=1, 
+                 alpha = 0.2,                               # change the point transparency 
+                 aes(color=Regulation)) +                    # color the points by Regulation
+      scale_color_manual(values=c("blue", "black", "red")) + # use these custom colors
+      geom_hline(yintercept = -log10(pcutoff),               # make a horizontal line at the padj cutoff
+                 linetype="longdash", 
+                 colour="grey", 
+                 linewidth=1) +
+      geom_label_repel(data = top_ten_genes,                 # add labels to the top ten genes
+                       aes(label = Gene),
+                       force = 2,
+                       nudge_y = 1,
+                       max.overlaps = 10,
+                       box.padding = .01,
+                       label.size = .01,
+                       size = 3) +
+    labs(title="DESeq2 results: disease vs healthy",                           
+         subtitle = paste0("up-regulated: ",                # add a subtitle with the number of up 
+                           nUP,                             # and down regulated genes
+                           ", down-regulated: ",
+                           nDOWN)) +
+    theme_bw()
+  
+  volc_plot
+  
+  ggsave(volc_plot, 
+         file = paste(part2_results, "volcano_plot.png", sep = "/"),
+         width = 7,
+         height = 5)
+  
+```
+## Heatmaps with `pheatmap`
+
+`pheatmap` is not part of `ggplot`, but it's a straightforward way to make heatmaps in R. `ggplot` heatmaps are more customizable, but they can get complicated.
+
+### Filter the cpm_matrix for genes of interest
+
+Why use the cpm matrix instead of the count data?
+
+```{r}
+de_genes <- 
+    resdf %>%
+    filter(Regulation %in% c("down-regulated", "up-regulated")) %>%
+    pull(Gene)
+
+cpm_de <- cpm_mat[de_genes,]
+```
+
+### Make an annotation table for the heatmap
+
+We use this table to label genes on the heatmap with extra information. Here we'll use it to label the genes by `Regulation` (up-regulated, down-regulated, or no change) and `padj`.
+
+```{r}
+anno <- 
+    resdf %>%
+    select(Regulation, padj)
+```
+
+### Make a color pallet for your heatmap
+
+For visualizing DE genes, it's best to use a diverging color palette like "RdBu" (red-blue). See more R Color Brewer palette options [here](https://r-graph-gallery.com/38-rcolorbrewers-palettes.html) or make your own pallet. 
+
+```{r}
+color_pal <- colorRampPalette(rev(brewer.pal(n = 11, name ="RdBu")))(20)
+color_pal
+```
+
+They are just vectors of hex codes.
+```{r, eval=F}
+"#053061" "#134C88" "#2268AD" "#3480B9" "#4B98C5" "#74B2D4" "#9BCAE0"
+"#BDDAEA" "#D8E8F1" "#ECF2F5" "#F8EFEA" "#FBE0D1" "#FAC9B1" "#F5AD8C"
+"#E88B6E" "#D96752" "#C6413E" "#B31B2C" "#8E0C25" "#67001F"
+```
+
+### Plot the heatmap
+
+**Clustering the rows**
+
+Group the genes (rows) by similar expression patterns across samples using hierarchical clustering.
+
+**Scaling**
+
+When plotting heatmaps of DE genes, it's helpful to "scale" the data across the rows. Scaling is equivalent to taking the z-score of the expression of each gene across samples. If the expression of gene $x$ in sample1 is equal to the mean expression across all samples, $z$ gene in sample1 is 0. For $x > mean$, $z > 0$. For $x < mean$, $z < 0$. 
+
+```{r}
+plot_all <- 
+  pheatmap(cpm_de,                 # matrix
+           color = color_pal,      # color palette
+           border_color = NA,      # don't use a border color
+           cluster_cols = FALSE,   # don't cluster the columns
+           cluster_rows = TRUE,    # cluster the rows (genes) so similar 
+           show_rownames = FALSE,  # there are too many genes for this
+           scale = "row",          # scaling across the rows
+           annotation_row = anno)  # use anno to annotate the rows
+
+plot_all
+
+## can't use ggsave because it's not a ggplot :-(
+png(file = paste(part2_results, "de_genes_heatmap.png", sep="/"))
+
+plot_all <- 
+  pheatmap(cpm_de,                 # matrix
+           color = color_pal,      # color palette
+           border_color = NA,      # don't use a border color
+           cluster_cols = FALSE,   # don't cluster the columns
+           cluster_rows = TRUE,    # cluster the rows (genes) 
+           show_rownames = FALSE,  # there are too many genes for this
+           scale = "row",          # scaling across the rows
+           annotation_row = anno)  # use anno to annotate the rows
+
+dev.off()
+```
+
+### No scale example 
+
+Use a sequential color palette for un-scaled data.
+
+```{r}
+sequential_pal <- colorRampPalette(brewer.pal(n = 9, name ="YlOrRd"))(20)
+sequential_pal
+```
+
+```{r, eval=F}
+"#FFFFCC" "#FFF7B9" "#FFEFA6" "#FEE794" "#FEDF83" "#FED471"
+"#FEC45F" "#FEB44E" "#FDA446" "#FD943F" "#FC7F38" "#FC6530"
+"#FA4B29" "#F03523" "#E51F1D" "#D7111F" "#C70623" "#B30026"
+"#990026" "#800026"
+```
+
+```{r}
+plot_no_scale <- 
+  pheatmap(cpm_de,                 # matrix
+           color = sequential_pal, # color pallete
+           border_color = NA,      # don't use a border color
+           cluster_cols = FALSE,   # don't cluster the columns
+           cluster_rows = TRUE,    # cluster the rows (genes) 
+           show_rownames = FALSE,  # there are too many genes for this
+           scale = "none",         # no scaling
+           annotation_row = anno)  # use anno to annotate the rows
+
+plot_no_scale
+```
+

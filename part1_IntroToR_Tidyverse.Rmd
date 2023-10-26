@@ -1,0 +1,613 @@
+---
+title: 'Part 1: Intro to R/Tidyverse'
+author: "Stephanie Hickey"
+date: "2023-10-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = TRUE,
+  message = TRUE,
+  R.options = list(width = 60)
+)
+```
+
+# Section 1: Getting Started w/ `readr`
+You can access all relevant material pertaining to this workshop [here](https://github.com/slepphickey/RNA-seq_RRM_2023).
+Other related workshops & useful [cheatsheets](http://github.com/jananiravi/cheatsheets).
+
+*Trouble with local installation?* Login & start using [**RStudio Cloud**](https://rstudio.cloud) right away!
+
+### Install packages
+
+If you haven't already
+```{r installing, eval=FALSE, echo=TRUE}
+
+install.packages("tidyverse")
+
+```
+
+If you're having trouble installing the entire tidyverse, you can install these individual packages instead
+```{r, eval=FALSE}
+# If tidyverse installation fails, install individual constituent packages this way...
+install.packages("readr")    # Importing data files
+install.packages("tidyr")    # Tidy Data
+install.packages("dplyr")    # Data manipulation
+install.packages("ggplot2")  # Data Visualization (w/ Grammar of Graphics)
+install.packages("readxl")   # Importing excel files
+```
+
+### Loading packages
+```{r loading, eval=T, echo=TRUE}
+library(tidyverse)
+# OR load the individual packages, if you have trouble installing/loading `tidyverse`
+# library(readr)
+# library(readxl)
+# library(tidyr)
+# library(dplyr)
+# library(ggplot2)
+```
+
+## Data import
+
+There are various functions for reading and writing data in the tidyverse, including:
+
+- `read_csv`, `write_csv`
+- `read_tsv`, `write_tsv`
+- `read_delim`, `write_delim`
+- `read_excel`
+
+Examples:
+```{r data-import1, eval=F, echo=T}
+# Comma-separated values, as exported from excel/spreadsheets
+data = read_csv(file="path/to/my_data.csv", col_names=T)
+
+# Other atypical delimiters
+data = read_delim(file="path/to/my_data.txt", col_names=T, delim="//")
+
+# Other useful packages
+# readxl by Jenny Bryan
+data = read_excel(path="path/to/excel.xls",
+           sheet=1,
+           range="A1:D50",
+           col_names=T)
+
+```
+
+Read in `GSE69360_part1_RNAseq.counts.txt`
+```{r data-import2, eval=T, echo=T}
+# tells us which directory we're currently in
+# if you opened Rstudio by clicking `RNA-seq_RRM_2023.Rproj`
+# you should already be in the `RNA-seq_RRM_2023` directory
+getwd() 
+
+# if not use `setwd()` to set the working directory to `RNA-seq_RRM_2023`
+# setwd("path/to/RNA-seq_RRM_2023")
+
+gse69360 = read_tsv("data/GSE69360_part1_RNAseq.counts.txt")
+```
+
+## Getting to know your data
+
+*Dataset details*:
+
+- AA: Agilent Adult; AF: Agilent Fetus
+- BA: BioChain Adult; BF: BioChain Fetus
+- OA: OriGene Adult
+- Tissues: Colon, Heart, Kidney, Liver, Lung, Stomach
+
+```{r data-structure, echo=TRUE, eval=F}
+str(gse69360)              # Structure of the dataframe
+gse69360                   # Data is in a cleaned up 'tibble' format by default
+head(gse69360)             # Shows the top few observations (rows) of your dataframe
+glimpse(gse69360)          # Info-dense summary of the data
+View(head(gse69360, 100))  # View data in a visual GUI-based spreadsheet-like format
+
+colnames(gse69360)         # Column names
+nrow(gse69360)             # No. of rows
+ncol(gse69360)             # No. of columns
+
+gse69360[1:5,7:10]         # Subsetting a dataframe
+
+## saving the data file
+write_tsv(gse69360[1:100,7:12], "data/gse_subset.txt")
+```
+
+***
+# Section 2: Reshaping data w/ `tidyr`
+```{r tidyr, echo=TRUE, eval=FALSE}
+
+pivot_longer()  # Pivot data from wide to long
+pivot_wider()   # Pivot data from long to wide
+
+separate() # Separate 1 COLUMN -> many COLUMNS
+unite()    # Unite several COLUMNS -> 1 COLUMN
+
+```
+
+## Long data is tidy data
+
+- `pivot_longer`: *Each row represents key-value pairs. Wide -> Long*
+- `pivot_wider`: *Spread key-value pairs across multiple columns: Long -> Wide*
+
+```{r gather-spread, echo=T, eval=T}
+# pivot longer all columns except 'Geneid'
+
+gse69360 %>% # Pipe ('then') operator serially connects operations
+  select(Geneid, matches("[AF]_")) %>% # select only the Geneid and sample columns, then...
+  pivot_longer(cols=matches("[AF]_"),  # columns we want to pivot longer into a new column
+               names_to="Sample",      # name of the new column
+               values_to="Counts")     # name of value column
+
+# pivot longer, then wider --> Back to original data
+gse69360 %>%
+  select(Geneid, matches("[AF]_")) %>%
+  pivot_longer(cols=matches("[AF]_"), names_to="Sample", values_to="Counts") %>% # wide -> long
+  pivot_wider(names_from="Sample", values_from="Counts") # long -> wide
+```
+
+## Unite, Separate
+
+- `separate`: *Separate one column into multiple columns*
+- `unite`:    *Unite multiple columns into one*
+
+```{r separate-unite, echo=T, eval=T}
+
+# separate `Sample` column into `Source_Stage` and `Tissue` columns
+gse69360 %>%
+  select(Geneid, matches("[AF]_")) %>%               # selecting only Geneid and Counts columns
+  pivot_longer(cols=matches("[AF]_"), names_to="Sample", values_to="Counts") %>% # wide -> long
+  separate(Sample, into=c("Source_Stage", "Tissue"), sep="_") # separate by delimiter 
+
+# separate `Source_Stage` column into `Source` and `Stage` columns
+gse69360 %>%
+  select(Geneid, matches("[AF]_")) %>%
+  pivot_longer(cols=matches("[AF]_"), names_to="Sample", values_to="Counts") %>%
+  separate(Sample, into=c("Source_Stage", "Tissue"), sep="_") %>%
+  separate(Source_Stage, into=c("Source", "Stage"), sep=1) # separate by char position
+
+# separate `Source_Stage` column into `Source` and `Stage` columns
+gse69360 %>%
+  select(Geneid, matches("[AF]_")) %>%
+  pivot_longer(cols=matches("[AF]_"), names_to="Sample", values_to="Counts") %>%
+  separate(Sample, into=c("Source_Stage", "Tissue"), sep="_") %>%
+  separate(Source_Stage, into=c("Source", "Stage"), sep=1) %>%
+  unite(Stage_Tissue, Stage, Tissue) # combining a different set of columns
+```
+
+***
+# Section 3: Data wranging with `dplyr`
+```{r dplyr, echo=TRUE, eval=FALSE}
+conflicted::conflict_prefer(name="filter", winner="dplyr")
+filter()    # PICK observations by their values | ROWS
+select()    # PICK variables by their names | COLUMNS
+mutate()    # CREATE new variables w/ functions of existing variables | COLUMNS
+transmute() # COMPUTE 1 or more COLUMNS but drop original columns
+arrange()   # REORDER the ROWS
+summarize() # COLLAPSE many values to a single SUMMARY
+group_by()  # GROUP data into rows with the same value of variable (COLUMN)
+```
+
+## Filter
+- `filter`: *Return rows with matching conditions*
+
+```{r filter, echo=TRUE, eval=TRUE}
+head(gse69360) # Snapshot of the dataframe
+
+# Now, filter by condition
+filter(gse69360, Length<=50)
+
+# Can be rewritten using "Piping" %>%
+gse69360 %>%   # Pipe ('then') operator to serially connect operations
+  filter(Length <= 50)
+
+# Filtering using regex/substring match
+gse69360 %>%
+  filter(grepl("chrY", Chr))
+
+# Two filters at a time
+gse69360 %>%
+  filter(Length <= 50 & grepl("chrY", Chr))
+
+# Two filters at a time
+gse69360 %>%
+  filter(Length <= 50,
+         grepl("chrY", Chr))
+```
+
+## Select
+
+- `select`: *Select/rename variables/columns by name*
+
+```{r select, echo=T, eval=T}
+# Selecting columns that match a pattern
+gse69360 %>%
+  select(Geneid, matches(".F_"))
+
+# Excluding specific columns
+gse69360 %>%
+  select(-Chr, -Start, -End, -Strand, -Length)
+
+# Excluding columns matching a pattern
+gse69360 %>%
+  select(-matches("[AF]_"))
+
+# Select then Filter
+gse69360 %>%
+  select(Geneid, Chr, Length, matches("[AF]_")) %>%
+  filter(grepl("chrY", Chr) | Length <= 100)
+```
+
+## Mutate
+- `mutate`: *Adds new variables; keeps existing variables*
+- `transmute`: *Adds new variables; drops existing variables*
+
+**Helpful resources**
+- Regular expressions [quickstart](https://www.regular-expressions.info/quickstart.html)
+- Regular expression [tester](https://regex101.com/)
+
+```{r mutate, echo=T, eval=T}
+
+# Storing gene location information in a separate dataframe
+gene_loc <- gse69360 %>%                                            # saving output to a variable
+  select(-matches("[AF]_")) %>%                                     # select columns
+  mutate(Geneid = gsub("\\.[0-9]*$", "", Geneid)) %>%               # remove isoform no.
+  mutate(Chr = gsub(";.*", "", Chr)) %>%                            # keep the first element for Chr
+  mutate(Start = as.numeric(gsub(";.*", "", Start))) %>%            # "" for Start
+  mutate(End = as.numeric(gsub(";.*", "", End))) %>%                # "" for End
+  mutate(Strand = gsub(";.*", "",Strand))                           # "" for Strand
+
+# Check to see if you have what you expected!
+gene_loc
+head(gene_loc, 10)
+
+# Creating new variables
+gene_loc %>%
+  mutate(kbStart = Start/1000,     # creates new variables/columns
+         kbEnd = End/1000,
+         kbLength = Length/1000)
+
+# Creating new variables & dropping old ones
+gene_loc %>%
+  transmute(kbStart = Start/1000,  # drops original columns
+            kbEnd = End/1000,
+            kbLength = Length/1000)
+
+```
+
+## Distinct & Arrange
+
+- `distinct`: *Pick unique entries*
+- `arrange`: *Arrange rows by variables*
+
+```{r arrange, echo=TRUE, eval=TRUE}
+# Pick only the unique entries in a column
+gene_loc %>%
+  distinct(Chr)
+
+gene_loc %>%
+  distinct(Strand)
+
+# Pick unique combinations
+gene_loc %>%
+  distinct(Chr, Strand)
+
+# Then sort aka arrange your data
+gene_loc %>%
+  arrange(desc(Chr))    # sort in descending order
+
+gene_loc %>%
+  arrange(Chr, Length)  # sort by Chr, then Length
+# arrange(Chr, -Length) # to reverse sort by 'numeric' Length
+```
+
+
+## Group_by & Summarize
+- `summarize`: *Reduces multiple values down to a single value*
+- `group_by`: *Combine entries by one or more variables*
+
+```{r summarize, eval=TRUE, echo=TRUE}
+# Combine by a variable, then calculate summary statistics for each group
+gene_loc %>%
+  group_by(Chr) %>%                         # group rows by Chr
+  summarize(numGenes = n(),                 # then summarise, number of genes/Chr
+            startoffirstGene = min(Start))  # min to get the first Start location
+
+# Example to show you can use all math/stat functions to summarize data groups
+gene_loc %>%
+  arrange(Length) %>%
+  group_by(Chr, Strand) %>%
+  summarize(numGenes = n(),
+            smallestGene = first(Geneid),
+            minLength = min(Length),
+            firstqLength = quantile(Length, 0.25),
+            medianLength = median(Length),
+            iqrLength = IQR(Length),
+            thirdqLength = quantile(Length, 0.75),
+            maxLength = max(Length),
+            longestGene = last(Geneid))
+
+# Saving your data locally
+gene_loc %>%
+  write_tsv("data/GSE69360.gene-locations.txt")
+
+```
+
+### More data wrangling
+Let's combine everything from above to tidy the full GSE69360 dataset.
+
+Dataset details:
+
+- AA: Agilent Adult; AF: Agilent Fetus
+- BA: BioChain Adult; BF: BioChain Fetus
+- OA: OriGene Adult
+- Tissues: Colon, Heart, Kidney, Liver, Lung, Stomach
+
+```{r more-wrangling, echo=TRUE, eval=TRUE}
+# Extracting just the expression values & cleaning it up
+View(head(gse69360, 50))
+
+gene_counts <- gse69360 %>%
+  select(-Chr, -Start, -End, -Strand, -Length) %>%          # another way to select just the expression data
+  rename(OA_Stomach = OA_Stomach1) %>%                      # rename couple of columns
+  mutate(OA_Stomach2 = NULL, OA_Stomach3 = NULL) %>%        # remove a couple of columns
+  mutate(Geneid = gsub("\\.[0-9]*$", "", Geneid))           # remove numbers after a period in the gene name
+
+logcpm <- gene_counts %>%
+  mutate(across(matches("[AF]_"), function(x) { log2((x*(1e+6)/sum(x)) + 1) }))  # convert counts in each sample to counts-per-million
+
+summary(logcpm)
+
+log_cpm_long <- 
+  logcpm %>%                            
+  pivot_longer(-Geneid, names_to="Sample", values_to="Logcpm") %>%     # convert to tidy data
+  separate(Sample,                                                     # cleanup complex variables
+           into = c("Source", "Stage", "Tissue"),
+           sep = c(1,2),
+           remove = F) %>%                                             # keep original variable
+  mutate(Tissue = gsub("^_", "", Tissue),                              
+         Stage = ifelse(Stage == "A", "Adult", "Fetus"),               
+         Source = case_when(                                           # another way to replace values
+           Source == "A" ~ "Agilent",
+           Source == "B" ~ "BioChain",
+           Source == "O" ~ "OriGene"
+         ))
+
+View(head(log_cpm_long, 50))
+
+# Plotting the distribution of gene-expression in each sample
+log_cpm_long %>%
+  ggplot(aes(x = Sample, y = Logcpm, color = Tissue, linetype = Stage)) +
+    geom_boxplot(outlier.size = 0.2, outlier.shape = 0.2) +
+    scale_y_continuous(limits = c(0, 1)) +
+    coord_flip() +
+    theme_minimal() 
+```
+
+***
+# Section 4: Visualizing tidy data w/ `ggplot`
+## Basics of ggplot2
+**Creating a plot w/ Grammar of Graphics**
+
+> 1. Recap and continuation of **dplyr**
+> 2. Basics of plotting data with **ggplot2**: `data`, `aes`, `geom`
+> 3. Customization: Colors, labels, and legends
+
+
+### Barplots & Histograms
+
+- `ggplot`, `factor`, `aes`
+- `geom_bar`, `geom_histogram`
+- `facet_wrap`
+- `scale_x_log10`, `labs`, `coord_flip`, `theme`, `theme_minimal`
+
+```{r ggplot-bars-hist, echo=T, eval=T}
+gene_loc %>%                                                      # data
+  ggplot(aes(x = Chr)) +                                          # aesthetics: what to plot?
+    geom_bar()                                                    # geometry: how to plot?
+
+# put chromosomes in specific order
+gene_loc$Chr <- factor(gene_loc$Chr,
+                       levels = paste("chr",
+                                      c((1:22), "X", "Y", "M"),
+                                      sep=""))
+
+plot_chr_numgenes <- 
+  gene_loc %>%
+    ggplot(aes(x = Chr)) +
+      geom_bar()
+
+plot_chr_numgenes
+
+plot_chr_numgenes +
+  coord_flip() +
+  theme_minimal()
+
+plot_chr_numgenes +
+  labs(title = "No. genes per chromosome",
+       x = "Chromosome",
+       y = "No. of genes") +
+  theme_minimal() +
+  coord_flip()
+
+gene_loc %>%
+  ggplot(aes(x = Length)) +
+    geom_histogram(color = "white") +
+    scale_x_log10() +
+    theme_minimal()
+
+plot_chr_genelength <- gene_loc %>%
+  ggplot(aes(x = Length, fill = Chr)) +
+    geom_histogram(color = "white") +
+    scale_x_log10() +
+    theme_minimal() +
+    facet_wrap(~Chr, scales = "free_y")
+
+plot_chr_genelength
+
+plot_chr_genelength +
+  theme(legend.position = "none",
+        axis.text.x=element_text(size=5)) +
+  labs(x = "Gene length (log-scale)",
+       y = "No. of genes") 
+  
+
+```
+
+### Scatter plots
+- `geom_point`
+- `geom_abline`, `geom_vline`, `geom_hline`
+- `geom_smooth`, `geom_text_repel`
+
+```{r ggplot-scatter, echo=TRUE, eval=TRUE}
+
+gene_loc %>%
+  ggplot(aes(x = End-Start, y = Length)) +
+  geom_point()
+
+plot_strend_length <- 
+  gene_loc %>%
+    ggplot(aes(x = End-Start, y = Length)) +
+      geom_point(alpha = 0.1, size = 0.5, color = "grey", fill = "grey") +
+      theme_minimal()
+    
+plot_strend_length
+
+plot_strend_length <- 
+  plot_strend_length +
+    scale_x_log10("End-Start") +
+    scale_y_log10("Gene length") +
+    theme_minimal()
+
+plot_strend_length
+
+plot_strend_length +
+  geom_abline(intercept = 0, slope = 1, col = "red") +
+  geom_hline(yintercept = 500, color = "blue") +
+  geom_vline(xintercept = 1000, color = "orange")
+
+gene_loc %>%
+  group_by(Chr) %>%
+  summarize(meanLength = mean(Length), numGenes = n())
+
+gene_loc %>%
+  group_by(Chr) %>%
+  summarize(meanLength = mean(Length), numGenes = n()) %>%
+  ggplot(aes(x = numGenes, y = meanLength)) +
+   geom_point()
+
+# install.packages("ggrepel", dependencies=T)
+library(ggrepel)
+gene_loc %>%
+  group_by(Chr) %>%
+  summarize(meanLength = mean(Length), numGenes = n()) %>%
+  ggplot(aes(x = numGenes, y = meanLength)) +
+    geom_point() +
+    geom_smooth(color = "lightblue", alpha = 0.1) +
+    labs(x = "No. of genes", y = "Mean gene length") +
+    geom_text_repel(aes(label = Chr), color="red", segment.color="grey80") +
+    theme_minimal()
+```
+
+### Boxplots & Violin plots
+- `geom_boxplot`, `geom_violin`
+- `scale_y_continuous`
+
+```{r echo=TRUE, eval=TRUE}
+log_cpm_long %>%
+  ggplot(aes(x = Sample, y = Logcpm, color = Tissue, linetype = Stage)) +
+    geom_boxplot() +
+    coord_flip() +
+    theme_minimal()
+
+log_cpm_long %>%
+  ggplot(aes(x = Sample, y = Logcpm, color = Tissue, linetype = Stage)) +
+    geom_violin() +
+    scale_y_continuous(limits = c(0, 0.5)) +
+    coord_flip() +
+    theme_minimal()
+
+# Plotting the distribution of gene-expression in each sample
+plot_sample_bxp <- log_cpm_long %>%
+  ggplot(aes(x = Sample, y = Logcpm, color = Tissue, linetype = Stage)) +
+    geom_boxplot(outlier.size = 0.2, outlier.alpha = 0.2) +
+    scale_y_continuous(limits = c(0, 1)) +
+    coord_flip() +
+    theme_minimal()
+
+plot_sample_bxp
+```
+
+### Reorganize a dataframe before plotting
+
+```{r echo=TRUE, eval=TRUE}
+# How similar is the gene expression from two different 
+# sequencing technologies in the same tissue?
+
+plot_ffcolon_scatter <- log_cpm_long %>%
+  filter(Sample == "AF_Colon" | Sample == "BF_Colon") %>%
+  select(Geneid, Sample, Logcpm) %>%
+  pivot_wider(names_from = Sample, values_from = Logcpm) %>%
+  ggplot(aes(x = AF_Colon, y = BF_Colon)) +
+    geom_point(alpha = 0.1, size = 0.5) +
+    geom_smooth(method=lm) +
+    theme_minimal()
+
+plot_ffcolon_scatter
+```
+
+***
+# Section 5: Export
+## Saving your plots
+### ggsave
+**Save a ggplot (or other grid object) with sensible defaults**
+
+```{r ggsave, eval=T, echo=TRUE}
+library(tidyverse)
+# make a new folder called "part1_results" with an "if" statment 
+if(!dir.exists("part1_results")){dir.create("part1_results")}
+
+# save the file name
+plot1_name <- "colon_expression_comparison_scatter.png"
+
+# save the full path to your file
+project_path <- getwd() 
+results_path <- paste(project_path, "part1_results", sep="/")
+
+# To save as a tab-delimited text file ...
+ggsave(filename=plot1_name,
+       path=results_path,
+       plot=plot_ffcolon_scatter,
+       device="png",
+       dpi=600)
+
+```
+
+## Saving your data files
+### write_csv & write_tsv
+**Write a dataframe to a delimited file**
+
+```{r write_delim, eval=F, echo=TRUE}
+library(tidyverse)
+# Save your file name
+filename <- "gse69360_tidy.txt"
+
+# Save your absolute/relative path
+data_path <- paste(getwd(), "data", sep="/")
+
+# To save as a tab-delimited text file ...
+write_tsv(x=log_cpm_long, # your final reformatted dataset
+          path=paste(data_path, filename, "/"), # Absolute path recommended.
+          # However, you can directly use 'filename' here
+          # if you are saving the file in the same directory
+          # as your code.
+          col_names=T) # if you want the column names to be
+# saved in the first row, recommended
+
+# Alternatively, you could save it as a comma-separated text file
+write_csv(x=log_cpm_long,
+          path=paste(data_path, filename, "/"),
+          col_names=T)
+```

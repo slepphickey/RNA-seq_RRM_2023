@@ -10,14 +10,12 @@ In this workshop, participants will use R programming to mine meaningful biologi
     - By the end of this section, you will be able to load your genomic
 dataset, perform basic data tidying & wrangling, data visualization, and
 save/export your results using `tidyverse`.
-    - [Credits](https://github.com/jananiravi/workshop-tidyverse/#credits)
 -   **Part 2: Data exploration and differential expression analysis**
     - In this section you will learn to filter, normalize, and visualize gene expression data. 
     - You will use a PCA plot to examine how samples relate to one another in gene expression space, and identify potential batch effects in the data.
     - You will identify genes differentially expressed between two conditions using `DESeq2` and visualize these genes using volcano plots and heat maps.
 -   **Part 3: Functional enrichment analysis**
     - In this section you will learn to manipulate Gene Association Files (GAFs) downloaded from geneontology.org.
-    - You will use `bioMaRt` to change gene IDs to gene symbols.
     - You will perform Gene Set Enrichment Analysis (GSEA) between differentially expressed genes and gene ontology categories and visualize the results with bubble plots.  
     
 ------------------------------------------------------------------------
@@ -79,7 +77,7 @@ IDE](https://www.rstudio.com/products/rstudio/download/#download).
 ## Credits
 
 [Arjun Krishnan](https://thekrishnanlab.org) and
-[Janani Ravi](https://jravilab.github.io) co-developed the content for Part 1 of this workshop, and put together the Setup material.
+[Janani Ravi](https://jravilab.github.io) co-developed the content for Part 1 of this workshop, and put together the setup material. See their repo [here](https://github.com/jananiravi/workshop-tidyverse/tree/main/transcriptomics).
 
 Sections of Part 2 of this workshop were adapted from [DIY Transcriptomics](https://diytranscriptomics.com/), an amazing (free) course put together by Prof. Dan Beiting at University of Pennsylvania School of Veterinary Medicine. It covers best practices for the analysis of high-throughput sequencing data from gene expression (RNA-seq) studies. I highly recommend it!
 

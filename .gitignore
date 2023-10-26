@@ -47,3 +47,10 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+data/GSE127831_part2_RNAseq.counts.txt
+part1_results
+part2_results
+part3_results
+data/goa_human.gaf
+*.html

@@ -1,7 +1,7 @@
 # Install necessary packages
 
 # CRAN packages
-install.packges(c("tidyverse", "here", "gganimate", "RColorBrewer", 
+install.packages(c("tidyverse", "here", "gganimate", "RColorBrewer", 
                   "matrixStats", "hrbrthemes", "DT", "gt",
                   "plotly", "patchwork", "matrixStats", "ggfortify", 
                   "ggrepel", "pheatmap", "knitr"))

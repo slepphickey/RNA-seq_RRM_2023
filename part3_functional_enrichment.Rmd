@@ -15,8 +15,10 @@ library(patchwork)
 library(fgsea)
 library(GO.db)
 library(RColorBrewer)
-conflicted::conflict_prefer(name="filter", winner="dplyr")
-conflicted::conflict_prefer(name="select", winner="dplyr")
+conflicted::conflict_prefer(name = "filter", winner = "dplyr")
+conflicted::conflict_prefer(name = "select", winner = "dplyr")
+conflicted::conflict_prefer(name = "desc", winner = "dplyr")
+conflicted::conflict_prefer(name = "rename", winner = "dplyr")
 
 set.seed(1) # to make sure that we get the same results for randomization
 ```
@@ -32,17 +34,19 @@ getwd()
 # setwd("path/to/RNA-seq_RRM_2023")
 project_path <- getwd()
 
-# make a new folder called "part3_results" to hold the results
-part3_results <- paste0(project_path, "/part3_results")
-if(!dir.exists(part3_results)){dir.create(part3_results)}
+# make a new folder called "part3_results" for the results
+# make an object holding folder name
+part3_results <- paste0(project_path, "/part3_results") 
+# only make the folder if a folder by that name DOES NOT already exist
+if(!dir.exists(part3_results)){dir.create(part3_results)} 
 
 ```
 
 ### Load the data
 
-*Gene association file*
+**Gene association file**
 
-There are 17 columns, and you can find the descriptions [here](https://geneontology.org/docs/go-annotation-file-gaf-format-2.1/). We'll only focus on these columns:
+Associates genes with GO terms. There are 17 columns, and you can find the descriptions [here](https://geneontology.org/docs/go-annotation-file-gaf-format-2.1/). We'll only focus on these columns:
 
   3. `DB Object Symbol`: Gene symbol  
   4. `Qualifier`: Tells how the gene is related to the Gene ontology category   
@@ -62,24 +66,30 @@ Also interesting:
       + Inferred from High Throughput Mutant Phenotype (HMP)    
       + Inferred from High Throughput Genetic Interaction (HGI)   
       + Inferred from High Throughput Expression Pattern (HEP)    
-  9. `Aspect`: The specific ontology the term belongs to. If you are only interested in catagories belonging to one of these, you can filter for them.   
+  9. `Aspect`: The specific ontology the term belongs to. For example, human “cytochrome c” can be described by the *molecular function* oxidoreductase activity, the *biological process* oxidative phosphorylation, and the *cellular component* mitochondrial intermembrane space. If you are only interested in categories belonging to one of these, you can filter for them.   
       + P (biological process)
       + F (molecular function) 
       + C (cellular component)
-
-*DESeq2 results*
-
-From Part 2: `part3_results/deseq2_results.txt`
-
-```{r, load data}
+      
+```{r, load gaf}
 # gene association file 
-gaf <- read_delim(file = "data/goa_human.gaf", comment = "!", col_names=F)
-deres <- read_delim(file = "part3_results/deseq2_results.txt")
+gaf <- read_tsv(file = "data/goa_human.gaf", comment = "!", col_names = FALSE)
+```
+
+**DESeq2 results**
+
+From Part 2: `part2_results/deseq2_results.txt`
+
+```{r, load deres}
+deres <- read_delim(file = "part2_results/deseq2_results.txt", delim = " ") 
 ```
 
 ## Gene set enrichment analysis
 
-Gene Set Enrichment Analysis (GSEA) is a computational method used to determine whether a predefined set of genes, known as a gene set, is significantly overrepresented among genes at the top and bottom of a list of genes ranked by some metric of interest, compared to what would be expected by chance. Here, the gene sets are genes associated with gene ontology terms, and the genes are ranked by the Wald statistic, `stat`, from DESeq2, which is equal to `log2(FoldChange)/standard error`.
+Gene Set Enrichment Analysis (GSEA) is a computational method used to determine whether a predefined set of genes, known as a gene set, is significantly overrepresented among genes at the top and bottom of a list of genes ranked by some metric of interest, compared to what would be expected by chance. Check out [Subramanian *et al*. 2005](
+https://doi.org/10.1073/pnas.0506580102) for an in depth explanation. 
+
+Here, the gene sets are genes associated with gene ontology terms, and the genes are ranked by the Wald statistic, `stat`, from DESeq2, which is equal to `log2(FoldChange)/standard error`.
 
 ### `.gaf` file manipulation 
 
@@ -101,7 +111,7 @@ gaf_list <-
   gaf %>%
   filter(!grepl("NOT", X4)) %>%  # filter out "NOT" relationships
   dplyr::select(X5, X3) %>%      # another package has a function called `select()`
-  rename(GOID = "X5",            # rename changes the column names
+  rename(GOID = "X5",            # rename() changes the column names
          Gene = "X3") %>%
   distinct() %>%
   dplyr::select(GOID, Gene) %>%
@@ -115,21 +125,29 @@ length(gaf_list)                 # how many list elements?
 head(names(gaf_list))            # names of the list elements
 
 # make a list of vectors containing the genes instead of a list of data frames
+class(gaf_list[[1]])
+
 go_list <- lapply(gaf_list, function(x) {y = x$Gene; y})
+
+class(go_list[[1]])
 
 # look at the first few list elements
 head(go_list)
+
+# names carry over from gaf_list
+head(names(go_list)) # names carry over from gaf_list
+
 ```
 
 ### GSEA with `fgsea`
 
-We need to make a vector of all of the genes from the DESeq2 results ranked by the Wald statistic, `stat`. Why `stat`?    
+We need to make a vector of all of the genes from the DESeq2 results ranked by the Wald statistic, `stat`. 
 ```{r}
 # make a vector of genes ranked by stat
 DEranks <- 
   deres %>%
-  filter(!is.na(Regulation)) %>%
-  dplyr::select(Gene, stat) %>%
+  filter(!is.na(padj)) %>%       # remove genes with no calculated padj
+  select(Gene, stat) %>%         # select Gene and stat cols
   arrange(stat) %>%              # ranks the genes by stat
   deframe()                      # turns the data frame into a named vector
 
@@ -155,14 +173,12 @@ head(fgseaRes)
       + $ES>0$ means the genes are enriched among up-regulated genes   
       + $ES<0$ means the genes are enriched among down-regulated genes   
   * `NES` – enrichment score normalized to mean enrichment of random samples of the same size   
-  * `size` – size of the pathway after removing genes not present in ‘names(stats)‘   
-  * `leadingEdge` – vector with indexes of leading edge genes that drive the enrichment   
+  * `size` – size of the pathway after removing genes not present in ‘names(DEranks)‘   
+  * `leadingEdge` – leading edge genes that drive the enrichment   
 
 ### Reformat the results table 
 
- * Use the GO.db package to get the descriptions that matching the GOIDs, and add this to the results table using `left_join()`   
- * Change the format of the `leadingEdge` from a list of character vectors to a vector of strings with `sapply()` and `toString()` 
-
+Use the GO.db package to get the descriptions that matching the GOIDs. Later, we'll add this to the results table using `left_join()`   
 ```{r}
 # extract all go term descriptions from the GO.db package
 goterms <- as.data.frame(Term(GOTERM))
@@ -174,20 +190,25 @@ colnames(goterms) <- "GOTerm"
 goterms$GOID <- rownames(goterms)
 
 head(goterms)
+```
 
+Change the format of the `leadingEdge` from a list of character vectors to a vector of strings with `sapply()` and `toString()` 
+```{r}
 # leading edge is a list of character vectors, where each row is a list element
+class(fgseaRes$leadingEdge)
+
+fgseaRes$leadingEdge[[1]]
+# we can only print cells in our data frame with length = 1
+length(fgseaRes$leadingEdge[[1]])
+
 # to print it as a tab delimited file, we need to change the column into one character vector
 # so we'll put all of the genes into one string
 # using toString() and sapply()
 
-class(fgseaRes$leadingEdge)
-
-fgseaRes$leadingEdge[[1]]
-length(fgseaRes$leadingEdge[[1]])
-
 toString(fgseaRes$leadingEdge[[1]])
 length(toString(fgseaRes$leadingEdge[[1]]))
 
+# another example
 fgseaRes$leadingEdge[[2]]
 length(fgseaRes$leadingEdge[[2]])
 
@@ -213,13 +234,14 @@ write_delim(fgseaReform, file = paste(part3_results,  "fgsea_results.csv", sep =
 
 # make interactive table
 fgseaTab <- 
-  fgseaRes %>%
+  fgseaReform %>%
   filter(padj < .05) %>%
   dplyr::select(-pval, 
                 -log2err,
                 -ES,
                 -NES,
-                -leadingEdgeSize) %>%
+                -leadingEdgeSize,
+                -size) %>%
   mutate(Regulation = as.factor(Regulation),
          padj = format(padj, digits=3)) 
   
@@ -246,23 +268,76 @@ sequential_pal <- colorRampPalette(brewer.pal(n = 9, name ="YlOrRd"))(20)
 # remove the lightest colors because they are hard to see
 sequential_pal_dark <- sequential_pal[5:20]
 
+# find the terms of interest
+down_oi <- 
+  fgseaReform %>%
+    filter(Regulation == "down-regulated") %>%                
+    slice_min(order_by=padj, n=10) %>%
+    pull(GOTerm)
+
+  up_oi <- 
+  fgseaReform %>%
+    filter(Regulation == "up-regulated") %>%                
+    slice_min(order_by=padj, n=10) %>%
+    pull(GOTerm)
+
+# find the smallest and largest leadingEdgeSize among the terms of interest
+small_edge =
+  fgseaReform %>%
+  filter(GOTerm %in% c(down_oi, up_oi)) %>%
+  pull(leadingEdgeSize) %>%
+  min()
+
+small_edge
+
+large_edge =
+  fgseaReform %>%
+  filter(GOTerm %in% c(down_oi, up_oi)) %>%
+  pull(leadingEdgeSize) %>%
+  max()
+
+large_edge
+
+# find the highest and lowest -log10(padj) among the terms of interest
+high_adj =
+  fgseaReform %>%
+  filter(GOTerm %in% c(down_oi, up_oi)) %>%
+  mutate(log_padj = -log10(padj)) %>%
+  pull(log_padj) %>%
+  max() %>%
+  ceiling() # rounds up to closest whole number
+
+high_adj
+
+low_adj =
+  fgseaReform %>%
+  filter(GOTerm %in% c(down_oi, up_oi)) %>%
+  mutate(log_padj = -log10(padj)) %>%
+  pull(log_padj) %>%
+  min() %>%
+  floor() # rounds down to closest whole number
+
+low_adj
+
+# plot
 plot_down_terms <- 
   fgseaReform %>%
-    filter(Regulation == "down-regulated") %>%                # filter for terms enriched with down-regulated genes            
-    slice_min(order_by=padj, n=10) %>%                         # select the terms with the 5 lowest padj
-    mutate(GOTerm = fct_reorder(GOTerm, desc(NES))) %>%       # order the terms by NES for the plot
+    filter(Regulation == "down-regulated") %>%            # filter for terms enriched with down-regulated genes            
+    slice_min(order_by=padj, n=10) %>%                    # select the terms with the 10 lowest padj
+    mutate(GOTerm = fct_reorder(GOTerm, desc(NES))) %>%   # order the terms by NES for the plot
     ggplot(aes(x=NES,                 
                y=GOTerm, 
-               size=leadingEdgeSize,                          # the size of the bubble relates to the leadingEdgeSize 
-               color = -log10(padj))) +                       # color the bubble by -log10(padj)
-      geom_point() +                                          # geom_point tells ggplot 2 to make a dot (bubble) plot
+               size=leadingEdgeSize,                      # size of the bubble = leadingEdgeSize 
+               color = -log10(padj))) +                   # color the bubble by -log10(padj)
+      geom_point() +                                      # make a dot (bubble) plot
       xlim(0,-4) +
-      lims(size = c(20, 200)) +                               # set size limits so the two plots are the same
-      scale_color_gradientn(colours = sequential_pal_dark,    # use the sequential_pal_dark to color the bubbles
-                            limits= c(4,50)) +                # set limits so the two plots are the same
+      lims(size = c(small_edge,large_edge)) +              # force the size limits to between small_edge and large_edge 
+      scale_color_gradientn(colours = sequential_pal_dark, # use the sequential_pal_dark to color the bubbles
+                            limits= c(low_adj,high_adj)) + # force the color key to go from low_adj to high_adj 
       labs(title="Gene Ontology Enrichment",                           
            subtitle = "down-regulated genes") +
-      xlab("Normalized Enrichment Score")
+      xlab("Normalized Enrichment Score") +
+      theme_bw()
 
 plot_up_terms <- 
   fgseaReform %>%
@@ -274,14 +349,16 @@ plot_up_terms <-
                color = -log10(padj))) +
       geom_point() + 
       xlim(0,4) +
-      lims(size = c(20, 200)) +  
+      lims(size = c(small_edge,large_edge)) +  
       scale_color_gradientn(colours = sequential_pal_dark,
-                            limits= c(4,50)) +
+                            limits= c(low_adj,high_adj)) +
       labs(title="Gene Ontology Enrichment",                           
            subtitle = "up-regulated genes") +
-      xlab("Normalized Enrichment Score")
+      xlab("Normalized Enrichment Score") +
+      theme_bw()
 
-both = (plot_down_terms | plot_up_terms) + plot_layout(guides = 'collect') # patchwork magic to combine the two plots
+# patchwork magic to combine the two plots
+both = (plot_down_terms | plot_up_terms) + plot_layout(guides = 'collect') 
 both
 
 ggsave(both, file = paste(part3_results, "goterm_bubble.png", sep = "/"), width=13, height=5)

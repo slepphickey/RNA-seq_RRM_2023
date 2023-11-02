@@ -169,7 +169,7 @@ gse69360 %>%
   separate(Source_Stage, into=c("Source", "Stage"), sep=1) # separate by char position
 
 # separate `Source_Stage` column into `Source` and `Stage` columns
-gse69360 %>%
+gse69360[100,] %>%
   select(Geneid, matches("[AF]_")) %>%
   pivot_longer(cols=matches("[AF]_"), names_to="Sample", values_to="Counts") %>%
   separate(Sample, into=c("Source_Stage", "Tissue"), sep="_") %>%
@@ -213,8 +213,9 @@ gse69360 %>%
 
 # Two filters at a time
 gse69360 %>%
-  filter(Length <= 50,
-         grepl("chrY", Chr))
+  filter(Length <= 50, 
+         grepl("chr10", Chr), 
+         Strand == "-;-")
 ```
 
 ## Select
@@ -320,14 +321,14 @@ gene_loc %>%
   arrange(Length) %>%
   group_by(Chr, Strand) %>%
   summarize(numGenes = n(),
-            smallestGene = first(Geneid),
+            smallestGene = dplyr::first(Geneid),
             minLength = min(Length),
             firstqLength = quantile(Length, 0.25),
             medianLength = median(Length),
             iqrLength = IQR(Length),
             thirdqLength = quantile(Length, 0.75),
             maxLength = max(Length),
-            longestGene = last(Geneid))
+            longestGene = dplyr::last(Geneid))
 
 # Saving your data locally
 gene_loc %>%
@@ -351,7 +352,7 @@ View(head(gse69360, 50))
 
 gene_counts <- gse69360 %>%
   select(-Chr, -Start, -End, -Strand, -Length) %>%          # another way to select just the expression data
-  rename(OA_Stomach = OA_Stomach1) %>%                      # rename couple of columns
+  dplyr::rename(OA_Stomach = OA_Stomach1) %>%                      # rename couple of columns
   mutate(OA_Stomach2 = NULL, OA_Stomach3 = NULL) %>%        # remove a couple of columns
   mutate(Geneid = gsub("\\.[0-9]*$", "", Geneid))           # remove numbers after a period in the gene name
 
@@ -423,7 +424,7 @@ plot_chr_numgenes
 
 plot_chr_numgenes +
   coord_flip() +
-  theme_minimal()
+  theme_classic()
 
 plot_chr_numgenes +
   labs(title = "No. genes per chromosome",
@@ -598,8 +599,8 @@ filename <- "gse69360_tidy.txt"
 data_path <- paste(getwd(), "data", sep="/")
 
 # To save as a tab-delimited text file ...
-write_tsv(x=log_cpm_long, # your final reformatted dataset
-          path=paste(data_path, filename, "/"), # Absolute path recommended.
+write_tsv(log_cpm_long, # your final reformatted dataset
+          file=paste(data_path, filename, sep = "/"), # Absolute path recommended.
           # However, you can directly use 'filename' here
           # if you are saving the file in the same directory
           # as your code.
@@ -608,6 +609,6 @@ write_tsv(x=log_cpm_long, # your final reformatted dataset
 
 # Alternatively, you could save it as a comma-separated text file
 write_csv(x=log_cpm_long,
-          path=paste(data_path, filename, "/"),
+          file=paste(data_path, filename, sep = "/"),
           col_names=T)
 ```

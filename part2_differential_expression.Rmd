@@ -85,7 +85,7 @@ rownames(counts_mat) = genes
 class(counts_mat)
 head(counts_mat)
 
-cpm_mat = cpm(counts_mat, log=TRUE)
+cpm_mat <- cpm(counts_mat, log=TRUE)
 dim(cpm_mat)
 ```
 
@@ -110,7 +110,7 @@ head(keepers)
 # keep the rows matching the "TRUE" genes in the keepers vector
 cpm_mat_filt <- cpm_mat[keepers,] 
 
-# what are the dimentions of the filtered and unfiltered matrices?
+# what are the dimensions of the filtered and unfiltered matrices?
 dim(cpm_mat)
 dim(cpm_mat_filt)
 ```
@@ -284,7 +284,7 @@ dds <- DESeq(dds)
   * `lfcSE`: gives the standard error of the log2FoldChange.    
   * `stat`: stat is the Wald statistic: the log2FoldChange divided by lfcSE
   * `pvalue`: two-tailed pvalue calculated by comparing the Wald statistic to a standard Normal distribution.          
-  * `padj`: The p-value adjusted for multiple comparisons using the Benjamini-Hochberg method. Also called the false discovery rate (FDR). Filtering for padj of `0.01` implies that 1% of significant tests will result in false positives. For a detailed explaination see StatQuest's video [False Discovery Rates, FDR, clearly explained](https://www.youtube.com/watch?v=K8LQSvtjcEo&ab_channel=StatQuestwithJoshStarmer)   
+  * `padj`: The p-value adjusted for multiple comparisons using the Benjamini-Hochberg method. Also called the false discovery rate (FDR). Filtering for padj of `0.01` implies that 1% of significant tests will result in false positives. For a detailed explanation see StatQuest's video [False Discovery Rates, FDR, clearly explained](https://www.youtube.com/watch?v=K8LQSvtjcEo&ab_channel=StatQuestwithJoshStarmer)   
 
 **NOTE: on p-values set to NA**
 
@@ -307,7 +307,7 @@ resdf <-
   relocate(Gene) %>% # makes Gene the first column 
   arrange(padj)
   
-write_delim(resdf, file = paste(part2_results, "deseq2_results.txt", sep = "/")) 
+write_tsv(resdf, file = paste(part2_results, "deseq2_results.txt", sep = "/"))
 
 # filter significant padj
 # and round numbers for display
@@ -328,7 +328,7 @@ Volcano plots display the `-log10(adjusted p-val)` on the y-axis and the`'log2Fo
 Genes with `log2FoldChange > 0` are up-regulated in the disease state relative to the healthy state, and genes `log2FoldChange < 0` are down-regulated in the disease state relative to the healthy state. We can be confident that genes are differentially expressed if `adjusted p-value < .01`. Genes above the gray line in the plot meet this threshold. The top 10 differentially expressed genes by `-log10(adjusted p-value)` are labeled.
 
 ```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
-# define the max adjusted pval 
+# define the max adjusted padj 
 pcutoff = .01
 
   # find the top ten DE genes by adj.P.Val so we can add labels to the plot
@@ -416,7 +416,7 @@ anno <-
 ### Make a color pallet for your heatmap
 
 For visualizing DE genes, it's best to use a diverging color palette like "RdBu" (red-blue). See more R Color Brewer palette options [here](https://r-graph-gallery.com/38-rcolorbrewers-palettes.html) or make your own pallet. 
-
+`
 ```{r}
 color_pal <- colorRampPalette(rev(brewer.pal(n = 11, name ="RdBu")))(20)
 color_pal

@@ -5,6 +5,9 @@ date: "2023-10-23"
 output: html_document
 ---
 
+[Arjun Krishnan](https://thekrishnanlab.org) and
+[Janani Ravi](https://jravilab.github.io) co-developed the content for Part 1 of this workshop. See their repo [here](https://github.com/jananiravi/workshop-tidyverse/tree/main/transcriptomics).
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,

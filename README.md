@@ -15,7 +15,7 @@ save/export your results using `tidyverse`.
     - In this section you will learn to filter, normalize, and visualize gene expression data. 
     - You will use a PCA plot to examine how samples relate to one another in gene expression space, and identify potential batch effects in the data.
     - You will identify genes differentially expressed between two conditions using `DESeq2` and visualize these genes using volcano plots and heat maps.  
-    -[Part 2: Tutorial](RNA-seq_RRM_2023/html/part2_differential_expression.html) 
+    - [Part 2: Tutorial](RNA-seq_RRM_2023/html/part2_differential_expression.html) 
 -   **Part 3: Functional enrichment analysis**
     - In this section you will learn to manipulate Gene Association Files (GAFs) downloaded from geneontology.org.
     - You will perform Gene Set Enrichment Analysis (GSEA) between differentially expressed genes and gene ontology categories and visualize the results with bubble plots.  

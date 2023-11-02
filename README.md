@@ -17,6 +17,7 @@ save/export your results using `tidyverse`.
 -   **Part 3: Functional enrichment analysis**
     - In this section you will learn to manipulate Gene Association Files (GAFs) downloaded from geneontology.org.
     - You will perform Gene Set Enrichment Analysis (GSEA) between differentially expressed genes and gene ontology categories and visualize the results with bubble plots.  
+    - [Part 3: Tutorial](slepphickey.github.io/RNA-seq_RRM_2023/blob/main/html/part3_functional_enrichment.html)
     
 ------------------------------------------------------------------------
 
@@ -80,4 +81,8 @@ IDE](https://www.rstudio.com/products/rstudio/download/#download).
 [Janani Ravi](https://jravilab.github.io) co-developed the content for Part 1 of this workshop, and put together the setup material. See their repo [here](https://github.com/jananiravi/workshop-tidyverse/tree/main/transcriptomics).
 
 Sections of Part 2 of this workshop were adapted from [DIY Transcriptomics](https://diytranscriptomics.com/), an amazing (free) course put together by Prof. Dan Beiting at University of Pennsylvania School of Veterinary Medicine. It covers best practices for the analysis of high-throughput sequencing data from gene expression (RNA-seq) studies. I highly recommend it!
+
+------------------------------------------------------------------------
+
+## Extra resources
 

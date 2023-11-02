@@ -10,11 +10,11 @@ In this workshop, participants will use R programming to mine meaningful biologi
     - By the end of this section, you will be able to load your genomic
 dataset, perform basic data tidying & wrangling, data visualization, and
 save/export your results using `tidyverse`.
-    - [Part 1: Tutorial](RNA-seq_RRM_2023/html/part2_IntroToR_Tidyverse.html)  
+    - [Part 1: Tutorial](RNA-seq_RRM_2023/html/part1_IntroToR_Tidyverse.html)  
 -   **Part 2: Data exploration and differential expression analysis**
     - In this section you will learn to filter, normalize, and visualize gene expression data. 
     - You will use a PCA plot to examine how samples relate to one another in gene expression space, and identify potential batch effects in the data.
-    - You will identify genes differentially expressed between two conditions using `DESeq2` and visualize these genes using volcano plots and heat maps.
+    - You will identify genes differentially expressed between two conditions using `DESeq2` and visualize these genes using volcano plots and heat maps.  
     -[Part 2: Tutorial](RNA-seq_RRM_2023/html/part2_differential_expression.html) 
 -   **Part 3: Functional enrichment analysis**
     - In this section you will learn to manipulate Gene Association Files (GAFs) downloaded from geneontology.org.
